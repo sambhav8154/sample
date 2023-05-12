@@ -1,0 +1,252 @@
+controller
+
+({
+    // To prepopulate the seleted value pill if value attribute is filled
+	doInit : function( component, event, helper ) {
+        component.set('v.SelectedName', '');
+        //alert(component.get('v.selectedRecords'));
+    	$A.util.toggleClass(component.find('resultsDiv'),'slds-is-open');
+		if( !$A.util.isEmpty(component.get('v.selectedRecords')) ) {
+			helper.searchRecordsHelper(component, event, helper, component.get('v.selectedRecords'));
+             
+		}
+	},
+
+    // When a keyword is entered in search box
+	searchRecords : function( component, event, helper ) {
+        if( !$A.util.isEmpty(component.get('v.searchString')) ) {
+		    helper.searchRecordsHelper(component, event, helper, []);
+        } else {
+            $A.util.removeClass(component.find('resultsDiv'),'slds-is-open');
+        }
+	},
+
+    // When an item is selected
+	selectItem : function( component, event, helper ) {
+        if(!$A.util.isEmpty(event.currentTarget.id)) {
+    		var recordsList = component.get('v.recordsList');
+            var selectedRecords = component.get('v.selectedRecords') || [];
+            var selectedDataObj = component.get('v.selectedDataObj') || [];
+            var SelectedName = component.get('v.SelectedName');
+            alert('Pre = '+SelectedName);
+    		var index = recordsList.findIndex(x => x.value === event.currentTarget.id)
+            if(index != -1) {
+                recordsList[index].isSelected = recordsList[index].isSelected === true ? false : true;
+                if(selectedRecords.includes(recordsList[index].value)) {
+                    selectedRecords.splice(selectedRecords.indexOf(recordsList[index].value), 1);
+                    var ind = selectedDataObj.findIndex(x => x.value === event.currentTarget.id)
+                    if(ind != -1) {selectedDataObj.splice(ind, 1)}
+                } else {
+                	selectedRecords.push(recordsList[index].value);
+                    selectedDataObj.push(recordsList[index]);
+                    SelectedName = SelectedName.trim();
+                    if (SelectedName.length == 0) {
+   						SelectedName = recordsList[index].label;
+                    }else{
+                        SelectedName = SelectedName +', '+ recordsList[index].label;
+                    }
+                    
+                }
+            }
+            component.set('v.recordsList', recordsList);
+            component.set('v.selectedRecords', selectedRecords);
+            component.set('v.selectedDataObj', selectedDataObj);
+            component.set('v.SelectedName', SelectedName);
+        }
+        $A.util.removeClass(component.find('resultsDiv'),'slds-is-open');
+	},
+    
+    removePill : function( component, event, helper ){
+        var recordId = event.getSource().get('v.name');
+        var recordsList = component.get('v.recordsList');
+        var selectedRecords = component.get('v.selectedRecords');
+        var selectedDataObj = component.get('v.selectedDataObj');
+        var SelectedName = component.get('v.SelectedName');
+        var resultString;
+        if(selectedRecords.length > 1){
+        selectedRecords.splice(selectedRecords.indexOf(recordId), 1);
+        var index = selectedDataObj.findIndex(x => x.value === recordId)
+        if(index != -1) {
+            selectedDataObj.splice(index, 1)
+        }
+        var ind = recordsList.findIndex(x => x.value === recordId)
+        if(ind != -1) {
+            recordsList[ind].isSelected = false;
+            resultString = SelectedName
+    .split(", ")
+    .filter(word => word !== recordsList[ind].label)
+    .join(", ");
+
+// Remove the last comma if there is one
+if (resultString.endsWith(", ")) {
+  resultString = resultString.slice(0, -2);
+}
+        }
+        component.set('v.recordsList', recordsList);
+        component.set('v.selectedDataObj', selectedDataObj);
+            component.set('v.selectedRecords', selectedRecords);
+            component.set('v.SelectedName', resultString);
+        }
+    },
+    
+    showRecords : function( component, event, helper ){
+        var disabled = component.get('v.disabled');
+        if(!disabled && !$A.util.isEmpty(component.get('v.recordsList')) && !$A.util.isEmpty(component.get('v.searchString'))) {
+            $A.util.addClass(component.find('resultsDiv'),'slds-is-open');
+        }
+    },
+
+    // To close the dropdown if clicked outside the inputbox.
+    blurEvent : function( component, event, helper ){
+        $A.util.removeClass(component.find('resultsDiv'),'slds-is-open');
+    },
+    
+    /*handleClick : function (cmp, event, helper) {
+         alert('Object' +cmp.get('v.selectedDataObj'));
+        alert('List' +cmp.get('v.selectedRecords'));
+    }*/
+})
+
+
+
+
+-----------------------------------------
+
+
+helper
+
+
+
+----------------------------------
+
+
+({
+	searchRecordsHelper : function(component, event, helper, selectedRecords) {       
+		$A.util.removeClass(component.find("Spinner"), "slds-hide");
+        component.set('v.message', '');
+        component.set('v.recordsList', []);
+        var searchString = component.get('v.searchString');
+    	var action = component.get('c.fetchRecords');
+        action.setParams({
+            'objectName' : component.get('v.objectName'),
+            'filterField' : component.get('v.fieldName'),
+            'searchString' : searchString,
+            'values' : JSON.stringify(selectedRecords)
+        });
+        action.setCallback(this,function(response){
+        	var result = response.getReturnValue();
+            
+        	if(response.getState() === 'SUCCESS') {
+    			if(result.length > 0) {
+    				// To check if value attribute is prepopulated or not
+					if( $A.util.isEmpty(selectedRecords) ) {
+                        var selectedRcrds = component.get('v.selectedRecords') || [];
+                        
+                        for(var i = 0; i < result.length; i++) {
+                            if(selectedRcrds.includes(result[i].value)){
+                            	result[i].isSelected = true;
+                            }
+                            
+                        }
+                        component.set('v.recordsList', result);        
+					} else {
+                        component.set('v.selectedDataObj', result);
+                        var selectedLabels = [];
+                        for(var i = 0; i < result.length; i++) {
+                           selectedLabels.push(result[i].label); 
+                        }
+                        var selectedLabelsString = selectedLabels.join(', ');
+                		component.set('v.SelectedName', selectedLabelsString);
+					}
+    			} else {
+    				component.set('v.message', "No Records Found for '" + searchString + '"');
+    			}
+                
+                //alert(selectedLabels);
+                
+                
+        	} else {
+                // If server throws any error
+                var errors = response.getError();
+                if (errors && errors[0] && errors[0].message) {
+                    component.set('v.message', errors[0].message);
+                }
+            }
+            // To open the drop down list of records
+            if( $A.util.isEmpty(selectedRecords) )
+                $A.util.addClass(component.find('resultsDiv'),'slds-is-open');
+        	$A.util.addClass(component.find("Spinner"), "slds-hide");
+        });
+        $A.enqueueAction(action);
+	}
+})
+
+
+
+
+*********************************************
+
+
+
+<!-- Code by CafeForce || www.cafeforce.com || support@cafeforce.com || Mandatory Header -->
+
+<aura:component controller="MultiSelectLookupController">
+
+	<!-- Attributes that can be set while component calling-->
+    <aura:attribute name="objectName" 		type="string" default="" required="true" />
+    <aura:attribute name="fieldName" 		type="string" default="" required="true" />
+    <aura:attribute name="selectedRecords" 	type="List"   default="[]" description="selected Records Id Array" />
+    <aura:attribute name="recordCount" 		type="string" default="5" description="Records visible at once"/>
+    <aura:attribute name="label" 			type="string" default="" description="Label will be displayed above input Box" />
+    <aura:attribute name="placeholder" 		type="string" default="Search..." description="placeholder for input Box" />
+    <aura:attribute name="disabled" 		type="Boolean" default="false" description="To disable the combobox"/>
+    <aura:attribute name="iconName" 		type="string" default="standard:drafts" description="complete icon name eg. standard:account" />
+    <aura:attribute name="SelectedName" type="string" default=""/>
+    <!-- Internal Use Attributes -->
+    <aura:handler name="init" value="{!this}" action="{!c.doInit}"/>
+    <aura:attribute name="message" 		   type="String" access="private" default="" />
+    <aura:attribute name="searchString"    type="string" access="private" default="" description="String to search"/>
+    <aura:attribute name="recordsList" 	   type="List"   access="private" description="List of Records having data" />
+    <aura:attribute name="selectedDataObj" type="List"   access="private" description="Selected Records Object List" />
+
+    <!-- Component Markup -->
+    <div>
+        <!--<p>{!if(!empty(v.label), v.label, '')}</p>-->
+        <aura:if isTrue="{!not(empty(v.label))}">
+    <p>{!v.label} : {!v.SelectedName}</p>
+</aura:if>
+        <div class="slds-combobox_container">
+            <div class="slds-combobox slds-dropdown-trigger slds-dropdown-trigger_click slds-is-open" aura:id="resultsDiv" aria-expanded="true" aria-haspopup="listbox" role="combobox">
+                <div class="slds-input-has-icon slds-input-has-icon_right">
+                    <!-- Icon, Search Bar, Search Icon -->
+                    <lightning:icon class="slds-combobox__input-entity-icon" iconName="{!v.iconName}" size="large" alternativeText="icon"/>
+                    <lightning:input aura:id="inputLookup" class="inputBox" placeholder="{!v.placeholder}" onblur="{!c.blurEvent}" onclick="{!c.showRecords}" disabled="{!v.disabled}" onkeyup="{!c.searchRecords}" value="{!v.searchString}" autoComplete="off" variant="label-hidden" id="combobox-id-1" />
+                    <lightning:icon class="slds-input__icon" iconName="utility:search" size="x-small" alternativeText="search"/> 
+                    <lightning:spinner class="slds-hide" aura:id="Spinner" alternativeText="Loading" size="small" variant="brand"/>
+                </div>
+                <!-- Dropdown List -->
+                <div id="listbox-id-1" class="slds-dropdown slds-dropdown_length-5 slds-dropdown_fluid" style="{! 'max-height:' + (8 + (v.recordCount * 40)) + 'px' }">
+                    <ul class="slds-listbox slds-listbox_vertical recordListBox">
+                        <aura:if isTrue="{!empty(v.message)}" >
+                            <!-- To display Drop down List -->
+                            <aura:iteration items="{!v.recordsList}" var="rec" >
+                                <li id="{!rec.value}" class="slds-listbox__item eachItem" onmousedown="{!c.selectItem}">
+                                    <lightning:icon class="{!if(rec.isSelected,'','slds-hide')}" iconName="utility:check" size="x-small" alternativeText="icon" />
+                                    <span class="verticalAlign slds-truncate">{!rec.label}</span>
+                                </li>
+                            </aura:iteration>
+                            <!-- To display Error Message -->
+                            <aura:set attribute="else">
+                                <span class="slds-media slds-listbox__option_entity">{!v.message}</span>
+                            </aura:set>
+                        </aura:if>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <aura:iteration items="{!v.selectedDataObj}" var="data">
+            <lightning:pill class="slds-m-around_xx-small" name="{!data.value}" label="{!data.label}" onremove="{!c.removePill}"/>
+        </aura:iteration>
+	</div>
+    <!--<lightning:button variant="base" label="Base" title="Base action" onclick="{! c.handleClick }"/>-->
+</aura:component>
